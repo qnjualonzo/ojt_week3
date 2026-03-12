@@ -3,7 +3,7 @@ node_modules/
 client/node_modules/
 server/node_modules/
 
-# Environment Variables (The most important part!)
+# Environment Variables 
 .env
 client/.env
 server/.env
