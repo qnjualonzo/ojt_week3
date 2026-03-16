@@ -1,43 +1,40 @@
-const pool = require("../config/db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const userRepo = require("../repositories/userRepository");
 
-exports.signup = async (req, res) => {
+exports.signup = async (req, res, next) => {
   try {
     const { username, password } = req.body;
-    
-    // 1. Encrypt (Hash) the password
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 2. Save to database
-    const newUser = await pool.query(
-      "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username",
-      [username, hashedPassword]
-    );
-
-    res.status(201).json({ message: "User created!", user: newUser.rows[0] });
+    const result = await userRepo.createUser(username, hashedPassword);
+    res.status(201).json({ message: "User created!", user: result.rows[0] });
   } catch (err) {
-    res.status(500).json({ error: "Username might already exist" });
+    if (err.code === "23505") {
+      return res.status(409).json({ error: "Username already exists" });
+    }
+    next(err);
   }
 };
 
-exports.login = async (req, res) => {
+exports.login = async (req, res, next) => {
   try {
     const { username, password } = req.body;
-    const user = await pool.query("SELECT * FROM users WHERE username = $1", [username]);
+    const result = await userRepo.findByUsername(username);
 
-    if (user.rows.length === 0) return res.status(400).json({ error: "User not found" });
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: "Invalid credentials" });
+    }
 
-    // 3. Compare encrypted password
-    const isMatch = await bcrypt.compare(password, user.rows[0].password);
+    const user = result.rows[0];
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
 
-    // 4. Generate JWT Token
-    const token = jwt.sign({ id: user.rows[0].id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-
-    res.json({ token, username: user.rows[0].username });
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    res.json({ token, username: user.username });
   } catch (err) {
-    res.status(500).json({ error: "Login failed" });
+    next(err);
   }
 };

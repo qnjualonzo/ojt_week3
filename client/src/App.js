@@ -1,36 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { fetchActivities, deleteActivity } from './services/api';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import useActivities from './hooks/useActivities';
 import ActivityForm from './features/ActivityForm'; 
 import AuthPage from './components/AuthPage'; 
-import ActivityChart from './components/ActivityChart'; // Added the chart for visualization
-import { generatePDF, generateExcel } from './utils/exportService'; // Import your report tools
+import ActivityChart from './components/ActivityChart';
+import { generatePDF, generateExcel } from './utils/exportService';
+import './App.css';
 
 function App() {
-  const [activities, setActivities] = useState([]);
-  const [editingActivity, setEditingActivity] = useState(null);
   const [user, setUser] = useState(null);
+  const [chartExpanded, setChartExpanded] = useState(false);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('username');
-    if (savedUser) {
-      setUser(savedUser);
-    }
+    if (savedUser) setUser(savedUser);
   }, []);
 
-  const loadActivities = async () => {
-    try {
-      const { data } = await fetchActivities();
-      setActivities(data);
-    } catch (err) {
-      console.error("Failed to load tasks");
-    }
-  };
-
-  useEffect(() => {
-    if (user) {
-      loadActivities();
-    }
-  }, [user]);
+  const {
+    activities, setActivities, editingActivity, setEditingActivity,
+    loadActivities, handleDelete,
+    page, totalPages, goToPage,
+  } = useActivities(user);
 
   const handleLoginSuccess = (username) => {
     localStorage.setItem('username', username);
@@ -41,14 +31,28 @@ function App() {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     setUser(null);
-    setActivities([]);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Delete this task?")) {
-      await deleteActivity(id);
-      loadActivities();
-    }
+  const handleDragEnd = (result) => {
+    if (!result.destination) return;
+    const items = Array.from(activities);
+    const [reordered] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reordered);
+    setActivities(items);
+  };
+
+  const formatDeadline = (deadline) => {
+    if (!deadline) return null;
+    const date = new Date(deadline);
+    const now = new Date();
+    const isOverdue = date < now;
+    const formatted = date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    return { formatted, isOverdue };
   };
 
   if (!user) {
@@ -57,28 +61,34 @@ function App() {
 
   return (
     <div className="App">
-      <header style={styles.header}>
-        <h1>OJT Task App</h1>
-        <div style={styles.userSection}>
-          {/* New Export Buttons */}
-          <div style={{ display: 'flex', gap: '10px', marginRight: '20px' }}>
-            <button onClick={() => generatePDF(activities, user)} style={styles.pdfBtn}>
-              📄 PDF Report
+      <header className="app-header">
+        <h1>Tasklith</h1>
+        <div className="user-section">
+          <div className="export-buttons">
+            <button onClick={() => generatePDF(activities, user)} className="btn btn-pdf">
+              PDF
             </button>
-            <button onClick={() => generateExcel(activities, user)} style={styles.excelBtn}>
-              📊 Excel Export
+            <button onClick={() => generateExcel(activities, user)} className="btn btn-excel">
+              Excel
             </button>
           </div>
-          
-          <span>Welcome, <strong>{user}</strong></span>
-          <button onClick={handleLogout} style={styles.logoutBtn}>Logout</button>
+          <span>{user}</span>
+          <button onClick={handleLogout} className="btn btn-logout">Exit</button>
         </div>
       </header>
       
-      <main style={{ padding: '20px' }}>
-        {/* Data Visualization Section */}
-        <div style={{ marginBottom: '30px' }}>
-             <ActivityChart />
+      <main className="app-main">
+        <div className="chart-section">
+          <button 
+            className="chart-toggle" 
+            onClick={() => setChartExpanded(!chartExpanded)}
+          >
+            <span>Statistics</span>
+            <span>{chartExpanded ? '−' : '+'}</span>
+          </button>
+          <div className={`chart-content ${chartExpanded ? '' : 'collapsed'}`}>
+            <ActivityChart />
+          </div>
         </div>
 
         <ActivityForm 
@@ -87,88 +97,66 @@ function App() {
           clearEdit={() => setEditingActivity(null)} 
         />
 
-        <div className="task-list" style={styles.taskList}>
-          <h3>Your Current Tasks</h3>
-          {activities.length === 0 ? <p>No tasks found. Add one above!</p> : null}
-          {activities.map(task => (
-            <div key={task.id} className="task-card" style={styles.card}>
-              <div style={{ flex: 1 }}>
-                <h4>{task.title}</h4>
-                <p style={{ fontSize: '0.9rem', color: '#666' }}>{task.description}</p>
-              </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setEditingActivity(task)}>Edit</button>
-                <button onClick={() => handleDelete(task.id)} style={styles.deleteBtn}>Delete</button>
-              </div>
+        <div className="task-list">
+          <h3>Tasks ({activities.length})</h3>
+          
+          {activities.length === 0 ? (
+            <div className="empty-state">No tasks yet. Create one above.</div>
+          ) : (
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <Droppable droppableId="tasks">
+                {(provided) => (
+                  <div {...provided.droppableProps} ref={provided.innerRef}>
+                    {activities.map((task, index) => {
+                      const deadlineInfo = formatDeadline(task.deadline);
+                      return (
+                        <Draggable key={task.id} draggableId={String(task.id)} index={index}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className={`task-card ${snapshot.isDragging ? 'dragging' : ''}`}
+                            >
+                              <span {...provided.dragHandleProps} className="drag-handle">⠿</span>
+                              <div className="task-content">
+                                <h4>{task.title}</h4>
+                                <p className="task-description">{task.description}</p>
+                                <div className="task-meta">
+                                  {deadlineInfo && (
+                                    <span className={`deadline ${deadlineInfo.isOverdue ? 'overdue' : ''}`}>
+                                      {deadlineInfo.isOverdue ? 'OVERDUE: ' : 'Due: '}{deadlineInfo.formatted}
+                                    </span>
+                                  )}
+                                  {task.drive_link && <span>File attached</span>}
+                                </div>
+                              </div>
+                              <div className="task-actions">
+                                <button className="btn" onClick={() => setEditingActivity(task)}>Edit</button>
+                                <button className="btn btn-delete" onClick={() => handleDelete(task.id)}>Delete</button>
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      );
+                    })}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </DragDropContext>
+          )}
+
+          {totalPages > 1 && (
+            <div className="pagination">
+              <button onClick={() => goToPage(page - 1)} disabled={page <= 1}>← Prev</button>
+              <span>Page {page} of {totalPages}</span>
+              <button onClick={() => goToPage(page + 1)} disabled={page >= totalPages}>Next →</button>
             </div>
-          ))}
+          )}
         </div>
       </main>
     </div>
   );
 }
-
-const styles = {
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '10px 40px',
-    backgroundColor: '#333',
-    color: 'white'
-  },
-  userSection: {
-    display: 'flex',
-    alignItems: 'center'
-  },
-  pdfBtn: {
-    padding: '8px 12px',
-    backgroundColor: '#e74c3c', // Red for PDF
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '0.85rem'
-  },
-  excelBtn: {
-    padding: '8px 12px',
-    backgroundColor: '#27ae60', // Green for Excel
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '0.85rem'
-  },
-  logoutBtn: {
-    padding: '5px 15px',
-    cursor: 'pointer',
-    backgroundColor: '#555',
-    color: 'white',
-    border: '1px solid #777',
-    borderRadius: '4px',
-    marginLeft: '15px'
-  },
-  deleteBtn: {
-    backgroundColor: '#ff4d4d',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer'
-  },
-  taskList: {
-    marginTop: '30px'
-  },
-  card: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '15px',
-    borderBottom: '1px solid #ddd',
-    backgroundColor: '#fff',
-    marginBottom: '10px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-  }
-};
 
 export default App;

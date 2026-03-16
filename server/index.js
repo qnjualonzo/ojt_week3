@@ -1,20 +1,8 @@
-const express = require("express");
-const cors = require("cors");
-const activityRoutes = require("./routes/activityRoutes");
-const startScheduler = require("./utils/scheduler"); // 1. Import it
-const authRoutes = require("./routes/authRoutes");
+require("./config/env"); // Validate env vars first (fail-fast)
 
-const app = express();
+const app = require("./app");
+const startScheduler = require("./utils/scheduler");
 
-app.use(cors());
-app.use(express.json());
-app.use("/uploads", express.static("uploads"));
-app.use("/api/auth", authRoutes);
-
-// Routes
-app.use("/api/activities", activityRoutes);
-
-// 2. Start the background processes
 startScheduler();
 
 const PORT = process.env.PORT || 5000;

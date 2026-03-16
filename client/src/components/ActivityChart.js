@@ -11,7 +11,6 @@ import {
     Legend 
 } from 'chart.js';
 
-// Register the chart components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const ActivityChart = () => {
@@ -23,17 +22,16 @@ const ActivityChart = () => {
     useEffect(() => {
         const loadStats = async () => {
             try {
-                // This calls the router.get("/stats", ...) we added earlier
                 const { data } = await API.get('/activities/stats');
                 
                 setChartData({
                     labels: data.map(row => row.task_date),
                     datasets: [{
-                        label: 'Tasks per Day',
+                        label: 'Tasks',
                         data: data.map(row => row.task_count),
-                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1,
+                        backgroundColor: '#000000',
+                        borderColor: '#000000',
+                        borderWidth: 0,
                     }]
                 });
             } catch (err) {
@@ -46,19 +44,51 @@ const ActivityChart = () => {
     const options = {
         responsive: true,
         plugins: {
-            legend: { position: 'top' },
-            title: { display: true, text: 'OJT Task Frequency' },
+            legend: { 
+                display: false 
+            },
+            title: { 
+                display: false 
+            },
         },
+        scales: {
+            x: {
+                grid: {
+                    display: false,
+                },
+                ticks: {
+                    color: '#000000',
+                    font: {
+                        family: "'SF Mono', 'Consolas', monospace",
+                        size: 10,
+                    }
+                },
+                border: {
+                    color: '#000000',
+                    width: 2,
+                }
+            },
+            y: {
+                grid: {
+                    color: '#cccccc',
+                },
+                ticks: {
+                    color: '#000000',
+                    font: {
+                        family: "'SF Mono', 'Consolas', monospace",
+                        size: 10,
+                    }
+                },
+                border: {
+                    color: '#000000',
+                    width: 2,
+                }
+            }
+        }
     };
 
     return (
-        <div style={{ 
-            backgroundColor: '#fff', 
-            padding: '20px', 
-            borderRadius: '8px', 
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            marginBottom: '20px' 
-        }}>
+        <div className="chart-wrapper">
             <Bar data={chartData} options={options} />
         </div>
     );

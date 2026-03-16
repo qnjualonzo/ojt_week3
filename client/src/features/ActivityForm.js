@@ -2,12 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { createActivity, updateActivity } from '../services/api';
 
 function ActivityForm({ onActivityAdded, editingActivity, clearEdit }) {
-  // Now managing an array of tasks for multiple additions
   const [tasks, setTasks] = useState([{ title: '', description: '', deadline: '', file: null }]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: '', message: '' });
 
-  // If editing, we just use the first row of our state
   useEffect(() => {
     if (editingActivity) {
       setTasks([{
@@ -21,22 +19,28 @@ function ActivityForm({ onActivityAdded, editingActivity, clearEdit }) {
     }
   }, [editingActivity]);
 
-  // Add a new blank row
   const addRow = () => {
     setTasks([...tasks, { title: '', description: '', deadline: '', file: null }]);
   };
 
-  // Remove a specific row
   const removeRow = (index) => {
     const newTasks = tasks.filter((_, i) => i !== index);
     setTasks(newTasks);
   };
 
-  // Handle changes for a specific row
   const handleInputChange = (index, field, value) => {
     const newTasks = [...tasks];
     newTasks[index][field] = value;
     setTasks(newTasks);
+  };
+
+  // Quick date helpers
+  const setQuickDate = (index, daysFromNow, hour = 17) => {
+    const date = new Date();
+    date.setDate(date.getDate() + daysFromNow);
+    date.setHours(hour, 0, 0, 0);
+    const formatted = date.toISOString().slice(0, 16);
+    handleInputChange(index, 'deadline', formatted);
   };
 
   const handleSubmit = async (e) => {
@@ -46,7 +50,6 @@ function ActivityForm({ onActivityAdded, editingActivity, clearEdit }) {
 
     try {
       if (editingActivity) {
-        // Single Update logic
         const formData = new FormData();
         formData.append('title', tasks[0].title);
         formData.append('description', tasks[0].description);
@@ -56,8 +59,6 @@ function ActivityForm({ onActivityAdded, editingActivity, clearEdit }) {
 
         await updateActivity(editingActivity.id, formData);
       } else {
-        // Multi-Create logic: Send requests for each row
-        // Note: For large batches, a single bulk-upload endpoint on the backend is better.
         for (const task of tasks) {
           const formData = new FormData();
           formData.append('title', task.title);
@@ -68,99 +69,115 @@ function ActivityForm({ onActivityAdded, editingActivity, clearEdit }) {
         }
       }
 
-      setStatus({ type: 'success', message: `✅ Successfully processed ${tasks.length} task(s)!` });
-      setTasks([{ title: '', description: '', deadline: '', file: null }]); // Reset to one blank row
+      setStatus({ type: 'success', message: `Saved ${tasks.length} task(s)` });
+      setTasks([{ title: '', description: '', deadline: '', file: null }]);
       onActivityAdded();
       if (editingActivity) setTimeout(() => clearEdit(), 1500);
       setTimeout(() => setStatus({ type: '', message: '' }), 3000);
 
     } catch (err) {
-      setStatus({ type: 'error', message: '❌ One or more tasks failed to save.' });
+      setStatus({ type: 'error', message: 'Failed to save task(s)' });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ padding: "20px", border: "1px solid #ddd", borderRadius: "12px", backgroundColor: "#ffffff", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
-      <h3 style={{ marginTop: 0, color: "#333" }}>
-        {editingActivity ? "📝 Edit Task" : "➕ Add Tasks"}
-      </h3>
+    <div className="form-section">
+      <h3>{editingActivity ? "Edit Task" : "Add Tasks"}</h3>
       
       {status.message && (
-        <div style={statusBanner(status.type)}>{status.message}</div>
+        <div className={`status-banner ${status.type}`}>{status.message}</div>
       )}
 
       <form onSubmit={handleSubmit}>
         {tasks.map((task, index) => (
-          <div key={index} style={rowContainer}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-               <span style={{ fontSize: '12px', color: '#718096' }}>Task #{index + 1}</span>
-               {tasks.length > 1 && !editingActivity && (
-                 <button type="button" onClick={() => removeRow(index)} style={removeBtnStyle}>Remove Row</button>
-               )}
+          <div key={index} className="task-row">
+            <div className="task-row-header">
+              <span className="task-row-number">Task #{index + 1}</span>
+              {tasks.length > 1 && !editingActivity && (
+                <button type="button" onClick={() => removeRow(index)} className="remove-row-btn">
+                  Remove
+                </button>
+              )}
             </div>
             
-            <input 
-              type="text" placeholder="Task Title" required
-              value={task.title} onChange={(e) => handleInputChange(index, 'title', e.target.value)} 
-              style={inputStyle}
-            />
-            <textarea 
-              placeholder="Description" required
-              value={task.description} onChange={(e) => handleInputChange(index, 'description', e.target.value)} 
-              style={{ ...inputStyle, minHeight: "60px" }}
-            />
+            <div className="form-row">
+              <label className="form-label">Title</label>
+              <input 
+                type="text" 
+                required
+                value={task.title} 
+                onChange={(e) => handleInputChange(index, 'title', e.target.value)} 
+                className="form-input"
+                placeholder="What needs to be done?"
+              />
+            </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={labelStyle}>Deadline:</label>
+            <div className="form-row">
+              <label className="form-label">Description</label>
+              <textarea 
+                required
+                value={task.description} 
+                onChange={(e) => handleInputChange(index, 'description', e.target.value)} 
+                className="form-textarea"
+                placeholder="Details..."
+              />
+            </div>
+
+            <div className="form-grid">
+              <div className="form-row">
+                <label className="form-label">Deadline</label>
                 <input 
-                  type="datetime-local" required
-                  value={task.deadline} onChange={(e) => handleInputChange(index, 'deadline', e.target.value)}
-                  style={inputStyle}
+                  type="datetime-local" 
+                  required
+                  value={task.deadline} 
+                  onChange={(e) => handleInputChange(index, 'deadline', e.target.value)}
+                  className="form-input"
                 />
+                <div className="quick-dates">
+                  <button type="button" className="quick-date-btn" onClick={() => setQuickDate(index, 0)}>
+                    Today
+                  </button>
+                  <button type="button" className="quick-date-btn" onClick={() => setQuickDate(index, 1)}>
+                    Tomorrow
+                  </button>
+                  <button type="button" className="quick-date-btn" onClick={() => setQuickDate(index, 7)}>
+                    +1 Week
+                  </button>
+                </div>
               </div>
-              <div style={{ flex: 1 }}>
-                <label style={labelStyle}>File:</label>
+              <div className="form-row">
+                <label className="form-label">Attachment</label>
                 <input 
-                  type="file" onChange={(e) => handleInputChange(index, 'file', e.target.files[0])} 
-                  style={{ fontSize: '12px', marginTop: '5px' }}
+                  type="file" 
+                  onChange={(e) => handleInputChange(index, 'file', e.target.files[0])} 
+                  className="form-input"
+                  style={{ padding: '8px' }}
                 />
               </div>
             </div>
-            <hr style={{ border: '0', borderTop: '1px solid #edf2f7', margin: '15px 0' }} />
           </div>
         ))}
 
         {!editingActivity && (
-          <button type="button" onClick={addRow} style={addMoreBtnStyle}>
-            + Add Another Row
+          <button type="button" onClick={addRow} className="add-row-btn">
+            + Add Another Task
           </button>
         )}
         
-        <div style={{ display: "flex", gap: "10px", marginTop: '20px' }}>
-            <button type="submit" disabled={loading} style={buttonStyle(loading)}>
-              {loading ? 'Processing...' : (editingActivity ? 'Update Task' : `Save ${tasks.length} Task(s)`)}
-            </button>
+        <div className="form-actions">
+          <button type="submit" disabled={loading} className="btn btn-primary">
+            {loading ? 'Saving...' : (editingActivity ? 'Update' : `Save (${tasks.length})`)}
+          </button>
 
-            {editingActivity && (
-              <button type="button" onClick={clearEdit} style={cancelButtonStyle}>Cancel</button>
-            )}
+          {editingActivity && (
+            <button type="button" onClick={clearEdit} className="btn">Cancel</button>
+          )}
         </div>
       </form>
     </div>
   );
 }
-
-// Styles
-const rowContainer = { marginBottom: '20px' };
-const labelStyle = { display: "block", fontSize: "11px", fontWeight: "bold", color: "#718096" };
-const inputStyle = { display: "block", marginBottom: "8px", width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #cbd5e0", fontSize: "14px" };
-const statusBanner = (type) => ({ padding: '12px', marginBottom: '15px', borderRadius: '6px', backgroundColor: type === 'success' ? '#e6fffa' : '#fff5f5', color: type === 'success' ? '#234e52' : '#822727', border: `1px solid ${type === 'success' ? '#38b2ac' : '#feb2b2'}` });
-const buttonStyle = (loading) => ({ flex: 1, padding: "12px", backgroundColor: loading ? "#a0aec0" : "#3182ce", color: "white", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: loading ? "not-allowed" : "pointer" });
-const addMoreBtnStyle = { width: '100%', padding: '10px', backgroundColor: '#f7fafc', border: '1px dashed #cbd5e0', borderRadius: '6px', color: '#4a5568', cursor: 'pointer', fontWeight: 'bold' };
-const removeBtnStyle = { background: 'none', border: 'none', color: '#e53e3e', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' };
-const cancelButtonStyle = { padding: "12px 20px", backgroundColor: "#edf2f7", color: "#4a5568", border: "1px solid #cbd5e0", borderRadius: "6px", cursor: "pointer" };
 
 export default ActivityForm;

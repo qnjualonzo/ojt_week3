@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // 1. Initialize Axios with base configuration
 const API = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
 });
 
 // 2. REQUEST INTERCEPTOR: Automatically attach the JWT token to every outgoing request
@@ -35,7 +35,8 @@ export const loginUser = (data) => API.post('/auth/login', data);
 export const signupUser = (data) => API.post('/auth/signup', data);
 
 // ACTIVITIES (Tasks)
-export const fetchActivities = () => API.get('/activities');
+export const fetchActivities = (page = 1, limit = 20) =>
+  API.get(`/activities?page=${page}&limit=${limit}`);
 
 export const createActivity = (formData) => API.post('/activities', formData, {
   headers: { 'Content-Type': 'multipart/form-data' } // Necessary for file uploads
