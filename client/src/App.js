@@ -58,7 +58,7 @@ function App() {
   return (
     <div className="App">
       <header style={styles.header}>
-        <h1>OJT Task Tracker</h1>
+        <h1>OJT Task App</h1>
         <div style={styles.userSection}>
           {/* New Export Buttons */}
           <div style={{ display: 'flex', gap: '10px', marginRight: '20px' }}>
