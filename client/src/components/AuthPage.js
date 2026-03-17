@@ -22,7 +22,12 @@ const AuthPage = ({ onLoginSuccess }) => {
                 setIsLogin(true);
             }
         } catch (err) {
-            setMessage(err.response?.data?.error || "An error occurred");
+            const apiError = err.response?.data;
+            const validationMessage = Array.isArray(apiError?.errors)
+                ? apiError.errors[0]?.msg
+                : null;
+
+            setMessage(validationMessage || apiError?.error || "An error occurred");
         }
     };
 
